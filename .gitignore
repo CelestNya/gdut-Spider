@@ -9,11 +9,14 @@ wheels/
 # Virtual environments
 .venv
 
-# Output files
-output/
+# Schedule files
+schedules/
 
 # Log files
 logs/
+
+# Cookie files
+cookies/
 
 # test files
 test.py

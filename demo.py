@@ -1,11 +1,12 @@
 from login import GDUTAuth
-from get_schedule import ScheduleManager
+from schedule import ScheduleManager
 from logger import logger
 
+
 def login():
-    """统一登录函数"""
+    """统一登录函数（带缓存）"""
     auth = GDUTAuth()
-    if auth.login(USERNAME, PASSWORD):
+    if auth.login_with_cache(USERNAME, PASSWORD):
         logger.success("登录成功！")
         return auth
     else:
@@ -36,7 +37,7 @@ def demo_load_from_file():
     """演示从文件加载课表"""
     logger.section("演示2：从文件加载课表")
     
-    schedule_manager = ScheduleManager()
+    schedule_manager = ScheduleManager(userid=USERNAME)
     year, season = 2025, "Autumn"
     schedule_data = schedule_manager.load_schedule_by_name(year, season)
     
@@ -50,7 +51,7 @@ def demo_filter_by_teacher():
     """演示按教师筛选课程"""
     logger.section("演示3：按教师筛选课程")
     
-    schedule_manager = ScheduleManager()
+    schedule_manager = ScheduleManager(userid=USERNAME)
     schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
     
     if schedule_data:
@@ -68,7 +69,7 @@ def demo_filter_by_day():
     """演示按星期筛选课程"""
     logger.section("演示4：按星期筛选课程")
     
-    schedule_manager = ScheduleManager()
+    schedule_manager = ScheduleManager(userid=USERNAME)
     schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
     
     if schedule_data:
@@ -86,7 +87,7 @@ def demo_statistics():
     """演示课表统计"""
     logger.section("演示5：课表统计")
     
-    schedule_manager = ScheduleManager()
+    schedule_manager = ScheduleManager(userid=USERNAME)
     schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
     
     if schedule_data:
@@ -97,7 +98,7 @@ def demo_format_options():
     """演示格式化选项"""
     logger.section("演示6：格式化选项")
     
-    schedule_manager = ScheduleManager()
+    schedule_manager = ScheduleManager(userid=USERNAME)
     schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
     
     if schedule_data:
@@ -147,10 +148,8 @@ def main():
     logger.section("广工教务系统爬虫 - 功能演示")
     
     # 登录凭据
-
     global USERNAME, PASSWORD
     USERNAME, PASSWORD = "", ""
-    
     
     print("\n" + "=" * 60)
     print("功能演示菜单")

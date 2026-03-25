@@ -1,143 +1,144 @@
-# 广工教务系统爬虫 - 使用指南
+# 教务系统爬虫 - 使用指南
 
-本指南将帮助你快速上手使用广工教务系统爬虫。
+本指南提供详细的使用说明和代码示例。
 
 ## 📦 安装
 
-### 1. 克隆或下载项目
 ```bash
-cd gdut-spider
-```
+# 克隆或下载项目
+cd gdut-Spider
 
-### 2. 安装依赖
-```bash
-# 使用uv（推荐）
+# 使用uv安装依赖
 uv sync
 ```
 
 ## 🚀 快速开始
 
-### 方式1：运行交互式演示
+### 运行交互式演示
 ```bash
-python main.py
+python demo.py
 ```
 
 程序会显示功能菜单，输入对应数字即可体验不同功能。
 
-### 方式2：编写自己的脚本
+## 📖 基础使用
 
-#### 基本使用 - 登录并获取课表
+### 1. 登录并获取课表
+
 ```python
 from login import GDUTAuth
-from get_schedule import ScheduleManager
+from schedule import ScheduleManager
 from logger import logger
 
-# 1. 登录
+# 登录（带Cookie缓存）
 auth = GDUTAuth()
-if auth.login("你的学号", "你的密码"):
+if auth.login_with_cache("你的学号", "你的密码"):
     logger.success("登录成功！")
     
-    # 2. 创建课表管理器
-    schedule_manager = ScheduleManager(auth.get_session())
+    # 创建课表管理器
+    schedule_manager = ScheduleManager(auth.get_session(), userid="你的学号")
     
-    # 3. 获取课表
+    # 获取课表
     schedule_data = schedule_manager.get_schedule(2025, "Autumn")
     
     if schedule_data:
-        # 4. 显示课表
+        # 显示课表
         schedule_manager.display_schedule(schedule_data, 2025, "Autumn")
         
-        # 5. 保存到文件
+        # 保存到文件
         schedule_manager.save_schedule_to_file(schedule_data, 2025, "Autumn")
 ```
 
-#### 从文件加载课表
-```python
-from get_schedule import ScheduleManager
+### 2. 从文件加载课表
 
-# 创建课表管理器（不需要登录）
-schedule_manager = ScheduleManager()
+```python
+from schedule import ScheduleManager
+
+# 创建课表管理器（需要提供userid）
+schedule_manager = ScheduleManager(userid="你的学号")
 
 # 从文件加载并显示
-schedule_manager.display_schedule_by_name(2025, "Autumn")
+schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
+if schedule_data:
+    schedule_manager.display_schedule(schedule_data, 2025, "Autumn")
 ```
 
-#### 按教师筛选课程
+### 3. 按教师筛选课程
+
 ```python
-from get_schedule import ScheduleManager
+from schedule import ScheduleManager
 
-schedule_manager = ScheduleManager()
-
-# 加载课表
+schedule_manager = ScheduleManager(userid="你的学号")
 schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
 
 # 筛选特定教师的课程
 teacher_courses = schedule_manager.filter_courses_by_teacher(schedule_data, "韩晓卓")
 
 # 显示筛选结果
-schedule_manager.display_schedule(teacher_courses)
+if teacher_courses:
+    schedule_manager.display_schedule(teacher_courses)
 ```
 
-#### 按星期筛选课程
+### 4. 按星期筛选课程
+
 ```python
-from get_schedule import ScheduleManager
+from schedule import ScheduleManager
 
-schedule_manager = ScheduleManager()
-
-# 加载课表
+schedule_manager = ScheduleManager(userid="你的学号")
 schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
 
 # 筛选周一的课程（"1"表示周一）
 monday_courses = schedule_manager.filter_courses_by_day(schedule_data, "1")
 
 # 显示筛选结果
-schedule_manager.display_schedule(monday_courses)
+if monday_courses:
+    schedule_manager.display_schedule(monday_courses)
 ```
 
-#### 查看课表统计
+### 5. 查看课表统计
+
 ```python
-from get_schedule import ScheduleManager
+from schedule import ScheduleManager
 
-schedule_manager = ScheduleManager()
-
-# 加载课表
+schedule_manager = ScheduleManager(userid="你的学号")
 schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
 
 # 显示统计信息
-schedule_manager.display_statistics(schedule_data)
+if schedule_data:
+    schedule_manager.display_statistics(schedule_data)
 ```
 
-## 📖 常用功能
+## 📚 常用功能
 
-### 1. 获取不同学期的课表
+### 获取不同学期的课表
 
 ```python
 from login import GDUTAuth
-from get_schedule import ScheduleManager
+from schedule import ScheduleManager
 
 auth = GDUTAuth()
-if auth.login("你的学号", "你的密码"):
-    schedule_manager = ScheduleManager(auth.get_session())
+if auth.login_with_cache("你的学号", "你的密码"):
+    schedule_manager = ScheduleManager(auth.get_session(), userid="你的学号")
     
     # 2025年秋季
-    schedule_manager.display_schedule_by_name(2025, "Autumn")
+    schedule_data = schedule_manager.get_schedule(2025, "Autumn")
     
     # 2026年春季
-    schedule_manager.display_schedule_by_name(2026, "Spring")
+    schedule_data = schedule_manager.get_schedule(2026, "Spring")
     
     # 2026年秋季（可能还未开放）
-    schedule_manager.display_schedule_by_name(2026, "Autumn")
+    schedule_data = schedule_manager.get_schedule(2026, "Autumn")
 ```
 
-### 2. 保存多个学期的课表
+### 保存多个学期的课表
 
 ```python
 from login import GDUTAuth
-from get_schedule import ScheduleManager
+from schedule import ScheduleManager
 
 auth = GDUTAuth()
-if auth.login("你的学号", "你的密码"):
-    schedule_manager = ScheduleManager(auth.get_session())
+if auth.login_with_cache("你的学号", "你的密码"):
+    schedule_manager = ScheduleManager(auth.get_session(), userid="你的学号")
     
     # 获取并保存多个学期
     terms = [
@@ -152,14 +153,12 @@ if auth.login("你的学号", "你的密码"):
             schedule_manager.save_schedule_to_file(schedule_data, year, season)
 ```
 
-### 3. 查找特定课程
+### 查找特定课程
 
 ```python
-from get_schedule import ScheduleManager
+from schedule import ScheduleManager
 
-schedule_manager = ScheduleManager()
-
-# 加载课表
+schedule_manager = ScheduleManager(userid="你的学号")
 schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
 
 # 查找包含特定关键词的课程
@@ -171,14 +170,12 @@ for course in schedule_data:
         print(f"  时间: 周{course['weekday']} {course['periods']}节")
 ```
 
-### 4. 生成课表报告
+### 生成课表报告
 
 ```python
-from get_schedule import ScheduleManager
+from schedule import ScheduleManager
 
-schedule_manager = ScheduleManager()
-
-# 加载课表
+schedule_manager = ScheduleManager(userid="你的学号")
 schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
 
 # 显示统计信息
@@ -195,9 +192,19 @@ for day in ["1", "2", "3", "4", "5", "6", "7"]:
         schedule_manager.display_schedule(day_courses)
 ```
 
+### 列出所有已保存的课表
+
+```python
+from schedule import ScheduleManager
+
+schedule_manager = ScheduleManager()
+schedule_manager.display_all_schedules()
+```
+
 ## 🎯 使用技巧
 
 ### 技巧1：批量处理多个学期
+
 ```python
 # 定义要处理的学期列表
 terms = [(2025, "Autumn"), (2026, "Spring")]
@@ -210,6 +217,7 @@ for year, season in terms:
 ```
 
 ### 技巧2：组合筛选条件
+
 ```python
 # 先按教师筛选
 teacher_courses = schedule_manager.filter_courses_by_teacher(schedule_data, "张老师")
@@ -219,6 +227,7 @@ monday_courses = schedule_manager.filter_courses_by_day(teacher_courses, "1")
 ```
 
 ### 技巧3：自定义格式化输出
+
 ```python
 # 加载课表
 schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
@@ -233,20 +242,22 @@ for course in schedule_data:
 ```
 
 ### 技巧4：导出为CSV格式
+
 ```python
 import csv
-from get_schedule import ScheduleManager
+from schedule import ScheduleManager
 
-schedule_manager = ScheduleManager()
+schedule_manager = ScheduleManager(userid="你的学号")
 schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
 
 # 导出到CSV
-with open('schedule.csv', 'w', encoding='utf-8', newline='') as f:
-    writer = csv.DictWriter(f, fieldnames=schedule_data[0].keys())
-    writer.writeheader()
-    writer.writerows(schedule_data)
-
-print("已导出到 schedule.csv")
+if schedule_data:
+    with open('schedule.csv', 'w', encoding='utf-8', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=schedule_data[0].keys())
+        writer.writeheader()
+        writer.writerows(schedule_data)
+    
+    print("已导出到 schedule.csv")
 ```
 
 ## 📊 数据结构
@@ -281,20 +292,13 @@ print("已导出到 schedule.csv")
 
 ## 🔧 配置说明
 
-### 修改登录信息
-在代码中找到以下部分并修改：
-```python
-userid = "你的学号"
-password = "你的密码"
-```
+### Cookie缓存
+系统会自动缓存登录Cookie，默认有效期为24小时。Cookie保存在 `cookies/{userid}/session.pkl`。
 
-### 修改输出目录
-默认输出目录为 `output/`，可以在代码中修改：
-```python
-output_dir = "output"  # 修改为你想要的目录
-```
+### 文件存储
+课表文件保存在 `schedules/{userid}/` 目录下，文件名格式为 `schedule_{year}_{season}.json`。
 
-### 修改日志级别
+### 日志级别
 在 `logger.py` 中修改：
 ```python
 logger = Logger("GDUTSpider", level=logging.DEBUG)  # 显示调试信息
@@ -321,25 +325,31 @@ A: 可能的原因：
 A: 查看 `logs/` 文件夹中的日志文件，文件名包含时间戳。
 
 ### Q: JSON文件保存在哪里？
-A: 默认保存在 `output/` 文件夹中，文件名格式为 `schedule_2025_Autumn.json`。
+A: 默认保存在 `schedules/{userid}/` 文件夹中，文件名格式为 `schedule_2025_Autumn.json`。
 
 ### Q: 可以离线使用吗？
 A: 可以！如果已经保存了JSON文件，可以不登录直接加载：
 ```python
-schedule_manager = ScheduleManager()
+schedule_manager = ScheduleManager(userid="你的学号")
 schedule_data = schedule_manager.load_schedule_by_name(2025, "Autumn")
+```
+
+### Q: 如何切换用户？
+A: 只需在创建 ScheduleManager 时提供不同的 userid：
+```python
+schedule_manager = ScheduleManager(userid="另一个学号")
 ```
 
 ## 📚 更多示例
 
-查看 `main.py` 文件，包含了所有功能的完整示例。
+查看 `demo.py` 文件，包含了所有功能的完整示例。
 
 ## 🆘 获取帮助
 
 如果遇到问题：
 1. 查看日志文件（logs/文件夹）
 2. 查看README.md了解更多信息
-3. 运行 `python main.py` 查看功能演示
+3. 运行 `python demo.py` 查看功能演示
 
 ## 📄 许可证
 

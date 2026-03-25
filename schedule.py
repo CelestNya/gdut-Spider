@@ -2,6 +2,7 @@ import requests
 import json
 import re
 import os
+from datetime import datetime
 from logger import logger
 
 
@@ -51,9 +52,8 @@ class ScheduleManager:
         self.session = session
         self.userid = userid
         self.JXFW_HOST = "jxfw.gdut.edu.cn"
-        logger.debug("ScheduleManager初始化完成")
 
-    def convert_to_xnxqdm(self, year: int, season: str) -> str:
+    def _convert_to_xnxqdm(self, year: int, season: str) -> str:
         """将年份和季节转换为学年学期代码
         
         Args:
@@ -65,13 +65,53 @@ class ScheduleManager:
         """
         season_code = self.SEASON_MAP.get(season, "01")
         
-        # Spring学年的代码是前一年加上"02"
         if season == "Spring":
             year = year - 1
         
-        xnxqdm = f"{year}{season_code}"
-        logger.debug(f"转换: {year}年{season} -> {xnxqdm}")
-        return xnxqdm
+        return f"{year}{season_code}"
+
+    def _check_schedule_not_available(self, html_content: str, year: int, season: str) -> bool:
+        """检查课表是否未开放
+        
+        Args:
+            html_content: HTML内容
+            year: 年份
+            season: 季节
+            
+        Returns:
+            bool: 如果课表未开放返回True
+        """
+        for keyword in self.NOT_AVAILABLE_KEYWORDS:
+            if keyword in html_content:
+                logger.warning(f"⚠️  {year}年{season}课表还未开放，请稍后查询！")
+                return True
+        return False
+
+    def _parse_schedule_data(self, html_content: str) -> list:
+        """解析课表数据
+        
+        Args:
+            html_content: HTML内容
+            
+        Returns:
+            list: 解析后的课表数据列表
+        """
+        schedule_data = []
+        pattern = r'\{[^}]*"kcmc"[^}]*\}'
+        matches = re.findall(pattern, html_content)
+        
+        for match in matches:
+            try:
+                data = json.loads(match)
+                converted_data = {
+                    self.KEY_MAPPING.get(key, key): value 
+                    for key, value in data.items()
+                }
+                schedule_data.append(converted_data)
+            except json.JSONDecodeError:
+                continue
+        
+        return schedule_data
 
     def get_schedule(self, year: int, season: str) -> list:
         """获取课表信息
@@ -90,22 +130,15 @@ class ScheduleManager:
         logger.section(f"获取 {year}年{season} 课表")
         
         try:
-            # 转换为学年学期代码
-            xnxqdm = self.convert_to_xnxqdm(year, season)
+            xnxqdm = self._convert_to_xnxqdm(year, season)
             logger.info(f"学年学期代码: {xnxqdm}")
             
-            # 先访问教务系统主页，建立会话
             logger.subsection("访问教务系统主页")
             home_url = f"https://{self.JXFW_HOST}/"
-            home_response = self.session.get(home_url)
-            logger.debug(f"主页响应状态码: {home_response.status_code}")
+            self.session.get(home_url)
             
-            # 访问课表页面
             logger.subsection("访问课表页面")
             schedule_url = f"https://{self.JXFW_HOST}/xsgrkbcx!xsAllKbList.action?xnxqdm={xnxqdm}"
-            logger.debug(f"课表URL: {schedule_url}")
-            
-            # 添加Referer头
             headers = {
                 "Referer": home_url,
                 "X-Requested-With": "XMLHttpRequest"
@@ -114,17 +147,11 @@ class ScheduleManager:
             response = self.session.get(schedule_url, headers=headers)
             response.raise_for_status()
             
-            logger.debug(f"课表响应状态码: {response.status_code}")
-            logger.debug(f"响应头: {dict(response.headers)}")
-            logger.debug(f"响应内容类型: {response.headers.get('Content-Type', 'unknown')}")
-            
-            # 检查是否课表未开放
-            if self.check_schedule_not_available(response.text, year, season):
+            if self._check_schedule_not_available(response.text, year, season):
                 return []
             
-            # 解析课表数据
             logger.subsection("解析课表数据")
-            schedule_data = self.parse_schedule_data(response.text)
+            schedule_data = self._parse_schedule_data(response.text)
             logger.info(f"解析完成，共 {len(schedule_data)} 门课程")
             
             return schedule_data
@@ -132,6 +159,24 @@ class ScheduleManager:
         except requests.RequestException as e:
             logger.failure(f"获取课表失败: {e}")
             return []
+
+    def _get_schedule_file(self, year: int, season: str) -> str:
+        """获取课表文件路径
+        
+        Args:
+            year: 年份
+            season: 季节
+            
+        Returns:
+            str: 文件路径
+        """
+        if not self.userid:
+            return None
+        
+        filename = f"schedule_{year}_{season}.json"
+        user_dir = os.path.join("schedules", self.userid)
+        os.makedirs(user_dir, exist_ok=True)
+        return os.path.join(user_dir, filename)
 
     def load_schedule_from_file(self, filepath: str) -> list:
         """从JSON文件加载课表数据
@@ -164,69 +209,71 @@ class ScheduleManager:
             logger.failure(f"加载文件失败: {e}")
             return []
 
-    def load_schedule_by_name(self, year: int, season: str, output_dir: str = "output") -> list:
+    def load_schedule_by_name(self, year: int, season: str) -> list:
         """根据年份和季节加载课表文件
         
         Args:
             year: 年份，如2025
             season: 季节，"Autumn"或"Spring"
-            output_dir: 输出文件夹，默认为"output"
             
         Returns:
             list: 课表数据列表，如果文件不存在或解析失败返回空列表
         """
-        filename = f"schedule_{year}_{season}.json"
-        filepath = os.path.join(output_dir, filename)
-        return self.load_schedule_from_file(filepath)
-
-    def list_all_schedules(self, output_dir: str = "output") -> list:
-        """列出所有已保存的课表及其元数据
+        if not self.userid:
+            logger.warning("未提供userid，无法加载课表")
+            return []
         
-        Args:
-            output_dir: 输出文件夹，默认为"output"
-            
+        filepath = self._get_schedule_file(year, season)
+        if filepath:
+            return self.load_schedule_from_file(filepath)
+        return []
+
+    def list_all_schedules(self) -> list:
+        """列出所有已保存的课表文件
+        
         Returns:
             list: 课表元数据列表，每个元素包含文件名、账号、更新时间等信息
         """
         schedules = []
+        output_dir = "schedules"
         
         if not os.path.exists(output_dir):
             logger.warning(f"输出文件夹不存在: {output_dir}")
             return schedules
         
-        for filename in os.listdir(output_dir):
-            if filename.startswith("schedule_") and filename.endswith(".json"):
-                filepath = os.path.join(output_dir, filename)
-                
-                try:
-                    with open(filepath, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
+        for userid in os.listdir(output_dir):
+            user_dir = os.path.join(output_dir, userid)
+            if not os.path.isdir(user_dir):
+                continue
+            
+            for filename in os.listdir(user_dir):
+                if filename.startswith("schedule_") and filename.endswith(".json"):
+                    filepath = os.path.join(user_dir, filename)
                     
-                    metadata = data.get('metadata', {})
-                    schedules.append({
-                        "filename": filename,
-                        "filepath": filepath,
-                        "userid": metadata.get('userid', 'unknown'),
-                        "update_time": metadata.get('update_time', 'unknown'),
-                        "year": metadata.get('year', 'unknown'),
-                        "season": metadata.get('season', 'unknown'),
-                        "course_count": metadata.get('course_count', 0)
-                    })
-                except Exception as e:
-                    logger.warning(f"读取文件 {filename} 失败: {e}")
-                    continue
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        
+                        metadata = data.get('metadata', {})
+                        schedules.append({
+                            "filename": filename,
+                            "filepath": filepath,
+                            "userid": metadata.get('userid', userid),
+                            "update_time": metadata.get('update_time', 'unknown'),
+                            "year": metadata.get('year', 'unknown'),
+                            "season": metadata.get('season', 'unknown'),
+                            "course_count": metadata.get('course_count', 0)
+                        })
+                    except Exception as e:
+                        logger.warning(f"读取文件 {filepath} 失败: {e}")
+                        continue
         
         schedules.sort(key=lambda x: x['update_time'], reverse=True)
-        
         return schedules
 
-    def display_all_schedules(self, output_dir: str = "output"):
-        """显示所有已保存的课表
-        
-        Args:
-            output_dir: 输出文件夹，默认为"output"
-        """
-        schedules = self.list_all_schedules(output_dir)
+    def display_all_schedules(self):
+        """显示所有已保存的课表"""
+        schedules = self.list_all_schedules()
         
         if not schedules:
             logger.info("没有找到已保存的课表文件")
@@ -244,60 +291,6 @@ class ScheduleManager:
             print(f"  文件路径: {schedule['filepath']}")
         
         print(f"\n共找到 {len(schedules)} 个课表文件")
-
-    def check_schedule_not_available(self, html_content: str, year: int, season: str) -> bool:
-        """检查课表是否未开放
-        
-        Args:
-            html_content: HTML内容
-            year: 年份
-            season: 季节
-            
-        Returns:
-            bool: 如果课表未开放返回True
-        """
-        for keyword in self.NOT_AVAILABLE_KEYWORDS:
-            if keyword in html_content:
-                logger.warning(f"⚠️  {year}年{season}课表还未开放，请稍后查询！")
-                return True
-        
-        return False
-
-    def parse_schedule_data(self, html_content: str) -> list:
-        """解析课表数据
-        
-        Args:
-            html_content: HTML内容
-            
-        Returns:
-            list: 解析后的课表数据列表
-        """
-        schedule_data = []
-        
-        # 使用正则表达式提取JSON数据
-        # 查找所有类似 {"kcmc":"...","kcbh":"...","jxbmc":"...","kcrwdm":"...","jcdm2":"...","zcs":"...","xq":"...","jxcdmcs":"...","teaxms":"..."} 的模式
-        pattern = r'\{[^}]*"kcmc"[^}]*\}'
-        matches = re.findall(pattern, html_content)
-        logger.debug(f"找到 {len(matches)} 个课程数据匹配")
-        
-        for i, match in enumerate(matches, 1):
-            try:
-                # 将字符串转换为字典
-                data = json.loads(match)
-                
-                # 转换键名为英文
-                converted_data = {}
-                for key, value in data.items():
-                    new_key = self.KEY_MAPPING.get(key, key)
-                    converted_data[new_key] = value
-                
-                schedule_data.append(converted_data)
-                logger.debug(f"成功解析课程 {i}: {converted_data.get('course_name', 'N/A')}")
-            except json.JSONDecodeError as e:
-                logger.debug(f"解析课程 {i} 失败: {e}")
-                continue
-        
-        return schedule_data
 
     def format_schedule(self, schedule_data: list, year: int = None, season: str = None) -> str:
         """格式化课表数据
@@ -317,7 +310,6 @@ class ScheduleManager:
         
         result = []
         
-        # 添加标题
         if year and season:
             result.append(f"{year}年{season}课表信息")
         else:
@@ -346,8 +338,7 @@ class ScheduleManager:
             year: 年份（可选）
             season: 季节（可选）
         """
-        formatted = self.format_schedule(schedule_data, year, season)
-        print(formatted)
+        print(self.format_schedule(schedule_data, year, season))
 
     def save_schedule_to_file(self, schedule_data: list, year: int, season: str, filename: str = None):
         """保存课表到文件
@@ -362,24 +353,23 @@ class ScheduleManager:
             logger.warning("没有课表数据可保存")
             return
         
-        # 创建output文件夹
-        output_dir = "output"
-        os.makedirs(output_dir, exist_ok=True)
+        if not self.userid:
+            logger.warning("未提供userid，无法保存课表")
+            return
         
-        if filename is None:
-            filename = f"schedule_{year}_{season}.json"
+        filepath = self._get_schedule_file(year, season)
+        if not filepath:
+            return
         
-        # 构建完整文件路径
-        filepath = os.path.join(output_dir, filename)
+        if filename:
+            user_dir = os.path.join("schedules", self.userid)
+            filepath = os.path.join(user_dir, filename)
         
-        # 获取当前时间
-        from datetime import datetime
         update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # 构建保存数据（包含元数据）
         save_data = {
             "metadata": {
-                "userid": self.userid or "unknown",
+                "userid": self.userid,
                 "update_time": update_time,
                 "year": year,
                 "season": season,
@@ -405,12 +395,8 @@ class ScheduleManager:
         Returns:
             list: 筛选后的课程列表
         """
-        filtered = []
-        for course in schedule_data:
-            teachers = course.get('teachers', '')
-            if teacher_name in teachers:
-                filtered.append(course)
-        return filtered
+        return [course for course in schedule_data 
+                if teacher_name in course.get('teachers', '')]
 
     def filter_courses_by_day(self, schedule_data: list, weekday: str) -> list:
         """根据星期筛选课程
@@ -422,12 +408,8 @@ class ScheduleManager:
         Returns:
             list: 筛选后的课程列表
         """
-        filtered = []
-        for course in schedule_data:
-            course_weekday = course.get('weekday', '')
-            if course_weekday == weekday:
-                filtered.append(course)
-        return filtered
+        return [course for course in schedule_data 
+                if course.get('weekday', '') == weekday]
 
     def get_course_statistics(self, schedule_data: list) -> dict:
         """获取课表统计信息
@@ -446,24 +428,18 @@ class ScheduleManager:
         }
         
         for course in schedule_data:
-            # 统计教师
             teachers = course.get('teachers', '')
             if teachers:
                 stats['unique_teachers'].add(teachers)
             
-            # 统计教室
             classroom = course.get('classroom', '')
             if classroom:
                 stats['unique_classrooms'].add(classroom)
             
-            # 统计每天的课程数
             weekday = course.get('weekday', '')
             day_name = self.WEEK_MAP.get(weekday, weekday)
-            if day_name not in stats['courses_by_day']:
-                stats['courses_by_day'][day_name] = 0
-            stats['courses_by_day'][day_name] += 1
+            stats['courses_by_day'][day_name] = stats['courses_by_day'].get(day_name, 0) + 1
         
-        # 转换set为list
         stats['unique_teachers'] = list(stats['unique_teachers'])
         stats['unique_classrooms'] = list(stats['unique_classrooms'])
         
