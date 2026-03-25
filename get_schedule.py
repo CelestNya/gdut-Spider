@@ -41,13 +41,15 @@ class ScheduleManager:
         "课表未开放"
     ]
     
-    def __init__(self, session: requests.Session = None):
+    def __init__(self, session: requests.Session = None, userid: str = None):
         """初始化课表管理器
         
         Args:
             session: 已登录的会话对象，如果为None则只能进行文件操作
+            userid: 用户账号ID
         """
         self.session = session
+        self.userid = userid
         self.JXFW_HOST = "jxfw.gdut.edu.cn"
         logger.debug("ScheduleManager初始化完成")
 
@@ -146,8 +148,13 @@ class ScheduleManager:
         
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
-                schedule_data = json.load(f)
+                data = json.load(f)
+            
+            schedule_data = data.get('schedule', [])
+            metadata = data.get('metadata', {})
             logger.success(f"成功加载课表文件: {filepath}")
+            logger.info(f"账号: {metadata.get('userid', 'unknown')}")
+            logger.info(f"更新时间: {metadata.get('update_time', 'unknown')}")
             logger.info(f"共 {len(schedule_data)} 门课程")
             return schedule_data
         except json.JSONDecodeError as e:
@@ -171,6 +178,72 @@ class ScheduleManager:
         filename = f"schedule_{year}_{season}.json"
         filepath = os.path.join(output_dir, filename)
         return self.load_schedule_from_file(filepath)
+
+    def list_all_schedules(self, output_dir: str = "output") -> list:
+        """列出所有已保存的课表及其元数据
+        
+        Args:
+            output_dir: 输出文件夹，默认为"output"
+            
+        Returns:
+            list: 课表元数据列表，每个元素包含文件名、账号、更新时间等信息
+        """
+        schedules = []
+        
+        if not os.path.exists(output_dir):
+            logger.warning(f"输出文件夹不存在: {output_dir}")
+            return schedules
+        
+        for filename in os.listdir(output_dir):
+            if filename.startswith("schedule_") and filename.endswith(".json"):
+                filepath = os.path.join(output_dir, filename)
+                
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    
+                    metadata = data.get('metadata', {})
+                    schedules.append({
+                        "filename": filename,
+                        "filepath": filepath,
+                        "userid": metadata.get('userid', 'unknown'),
+                        "update_time": metadata.get('update_time', 'unknown'),
+                        "year": metadata.get('year', 'unknown'),
+                        "season": metadata.get('season', 'unknown'),
+                        "course_count": metadata.get('course_count', 0)
+                    })
+                except Exception as e:
+                    logger.warning(f"读取文件 {filename} 失败: {e}")
+                    continue
+        
+        schedules.sort(key=lambda x: x['update_time'], reverse=True)
+        
+        return schedules
+
+    def display_all_schedules(self, output_dir: str = "output"):
+        """显示所有已保存的课表
+        
+        Args:
+            output_dir: 输出文件夹，默认为"output"
+        """
+        schedules = self.list_all_schedules(output_dir)
+        
+        if not schedules:
+            logger.info("没有找到已保存的课表文件")
+            return
+        
+        logger.section("已保存的课表列表")
+        
+        for i, schedule in enumerate(schedules, 1):
+            print(f"\n课表 {i}:")
+            print(f"  文件名: {schedule['filename']}")
+            print(f"  账号: {schedule['userid']}")
+            print(f"  学期: {schedule['year']}年{schedule['season']}")
+            print(f"  更新时间: {schedule['update_time']}")
+            print(f"  课程数量: {schedule['course_count']} 门")
+            print(f"  文件路径: {schedule['filepath']}")
+        
+        print(f"\n共找到 {len(schedules)} 个课表文件")
 
     def check_schedule_not_available(self, html_content: str, year: int, season: str) -> bool:
         """检查课表是否未开放
@@ -276,30 +349,6 @@ class ScheduleManager:
         formatted = self.format_schedule(schedule_data, year, season)
         print(formatted)
 
-    def display_schedule_from_file(self, filepath: str, year: int = None, season: str = None):
-        """从文件加载并显示课表
-        
-        Args:
-            filepath: JSON文件路径
-            year: 年份（可选）
-            season: 季节（可选）
-        """
-        schedule_data = self.load_schedule_from_file(filepath)
-        if schedule_data:
-            self.display_schedule(schedule_data, year, season)
-
-    def display_schedule_by_name(self, year: int, season: str, output_dir: str = "output"):
-        """根据年份和季节加载并显示课表
-        
-        Args:
-            year: 年份，如2025
-            season: 季节，"Autumn"或"Spring"
-            output_dir: 输出文件夹，默认为"output"
-        """
-        schedule_data = self.load_schedule_by_name(year, season, output_dir)
-        if schedule_data:
-            self.display_schedule(schedule_data, year, season)
-
     def save_schedule_to_file(self, schedule_data: list, year: int, season: str, filename: str = None):
         """保存课表到文件
         
@@ -323,9 +372,25 @@ class ScheduleManager:
         # 构建完整文件路径
         filepath = os.path.join(output_dir, filename)
         
+        # 获取当前时间
+        from datetime import datetime
+        update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 构建保存数据（包含元数据）
+        save_data = {
+            "metadata": {
+                "userid": self.userid or "unknown",
+                "update_time": update_time,
+                "year": year,
+                "season": season,
+                "course_count": len(schedule_data)
+            },
+            "schedule": schedule_data
+        }
+        
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(schedule_data, f, ensure_ascii=False, indent=2)
+                json.dump(save_data, f, ensure_ascii=False, indent=2)
             logger.success(f"课表已保存到: {filepath}")
         except Exception as e:
             logger.failure(f"保存课表失败: {e}")

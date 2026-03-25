@@ -83,18 +83,18 @@ class GDUTAuth:
         url = f"{self.HOST}/{path.lstrip('/')}" if path else self.HOST
         return f"{url}?{query}" if query else url
 
-    def login(self, username: str, password: str) -> bool:
+    def login(self, userid: str, password: str) -> bool:
         """登录教务系统
         
         Args:
-            username: 学号
+            userid: 学号
             password: 密码
             
         Returns:
             bool: 登录是否成功
         """
         logger.section("开始登录流程")
-        logger.info(f"用户名: {username}")
+        logger.info(f"学号: {userid}")
         
         login_path = "authserver/login"
         encoded_login_service = requests.utils.quote(self.LOGIN_SERVICE_URL)
@@ -156,7 +156,7 @@ class GDUTAuth:
             # 加密密码
             logger.debug("开始加密密码...")
             encrypted_password = GDUTCrypto.encrypt(password, salt)
-            form_data["username"] = username
+            form_data["username"] = userid
             form_data["password"] = encrypted_password
             form_data["captcha"] = ""
             form_data["rememberMe"] = "true"

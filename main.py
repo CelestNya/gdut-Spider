@@ -21,7 +21,7 @@ def demo_login_and_fetch():
     if not auth:
         return
     
-    schedule_manager = ScheduleManager(auth.get_session())
+    schedule_manager = ScheduleManager(auth.get_session(), userid=USERNAME)
     year, season = 2025, "Autumn"
     schedule_data = schedule_manager.get_schedule(year, season)
     
@@ -116,7 +116,7 @@ def demo_multiple_terms():
     if not auth:
         return
     
-    schedule_manager = ScheduleManager(auth.get_session())
+    schedule_manager = ScheduleManager(auth.get_session(), userid=USERNAME)
     test_cases = [
         (2025, "Autumn"),
         (2026, "Spring"),
@@ -134,9 +134,23 @@ def demo_multiple_terms():
             logger.info(f"{year}年{season}课表未开放或无数据")
 
 
+def demo_list_schedules():
+    """演示列出所有已保存的课表"""
+    logger.section("演示8：列出所有已保存的课表")
+    
+    schedule_manager = ScheduleManager()
+    schedule_manager.display_all_schedules()
+
+
 def main():
     """主函数"""
     logger.section("广工教务系统爬虫 - 功能演示")
+    
+    # 登录凭据
+
+    global USERNAME, PASSWORD
+    USERNAME, PASSWORD = "", ""
+    
     
     print("\n" + "=" * 60)
     print("功能演示菜单")
@@ -148,10 +162,11 @@ def main():
     print("5. 课表统计")
     print("6. 格式化选项")
     print("7. 获取多个学期的课表")
+    print("8. 列出所有已保存的课表")
     print("0. 运行所有演示")
     print("=" * 60)
     
-    choice = input("\n请选择演示功能 (0-7): ").strip()
+    choice = input("\n请选择演示功能 (0-8): ").strip()
     
     demos = {
         "1": demo_login_and_fetch,
@@ -161,6 +176,7 @@ def main():
         "5": demo_statistics,
         "6": demo_format_options,
         "7": demo_multiple_terms,
+        "8": demo_list_schedules,
     }
     
     if choice == "0":
@@ -174,8 +190,6 @@ def main():
     
     logger.section("演示结束")
 
-USERNAME = ""
-PASSWORD = ""
 
 if __name__ == "__main__":
     main()

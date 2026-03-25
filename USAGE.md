@@ -284,7 +284,7 @@ print("已导出到 schedule.csv")
 ### 修改登录信息
 在代码中找到以下部分并修改：
 ```python
-username = "你的学号"
+userid = "你的学号"
 password = "你的密码"
 ```
 
