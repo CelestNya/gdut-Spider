@@ -4,42 +4,6 @@ import os
 from datetime import datetime
 
 
-class ColorFormatter(logging.Formatter):
-    """彩色日志格式化器"""
-    
-    # ANSI颜色代码
-    COLORS = {
-        'DEBUG': '\033[36m',      # 青色
-        'INFO': '\033[37m',       # 白色
-        'WARNING': '\033[33m',    # 黄色
-        'ERROR': '\033[31m',      # 红色
-        'CRITICAL': '\033[35m',   # 紫色
-        'RESET': '\033[0m',       # 重置
-        'GREEN': '\033[32m',      # 绿色
-        'BLUE': '\033[34m',       # 蓝色
-        'BOLD': '\033[1m',       # 粗体
-    }
-    
-    def format(self, record):
-        # 获取日志级别对应的颜色
-        levelname = record.levelname
-        color = self.COLORS.get(levelname, self.COLORS['RESET'])
-        reset = self.COLORS['RESET']
-        
-        # 格式化时间戳
-        timestamp = self.formatTime(record, '%Y-%m-%d %H:%M:%S')
-        
-        # 格式化消息
-        message = record.getMessage()
-        
-        # 应用颜色
-        colored_levelname = f"{color}{levelname}{reset}"
-        colored_message = f"{color}{message}{reset}"
-        
-        # 返回格式化后的日志
-        return f"[{timestamp}] [{colored_levelname}] {colored_message}"
-
-
 class ColoredFormatter(logging.Formatter):
     """炫彩日志格式化器"""
     

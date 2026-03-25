@@ -21,23 +21,12 @@ gdut-Spider/
 
 ## 🔧 功能特性
 
-### 核心功能
-- ✅ 自动登录教务系统
-- ✅ 密码AES-CBC加密
-- ✅ 会话管理（JSESSIONID）
-- ✅ 获取课表信息
-- ✅ 支持不同学期的课表查询
-- ✅ 课表数据解析和格式化
-- ✅ 统一的炫彩日志管理
-- ✅ 课表数据保存到JSON文件
-
-### 高级功能
-- ✅ 从JSON文件加载课表
-- ✅ 按教师筛选课程
-- ✅ 按星期筛选课程
-- ✅ 课表统计分析
-- ✅ 灵活的格式化选项
-- ✅ 独立的文件操作模式
+- 自动登录教务系统（密码AES-CBC加密、会话管理）
+- 获取课表信息（支持不同学期查询）
+- 课表数据解析、格式化和保存
+- 课表筛选（按教师、按星期）和统计分析
+- 统一的炫彩日志管理
+- 灵活的文件操作模式
 
 ## 📦 安装依赖
 
@@ -103,95 +92,19 @@ if auth.login("你的学号", "你的密码"):
 
 ### logger.py - 日志管理模块
 
-提供统一的炫彩日志管理功能，支持多种颜色和日志级别。
-
-**主要类：**
-- `Logger`: 日志管理类
-- `ColoredFormatter`: 炫彩日志格式化器
-
-**主要方法：**
-- `debug(message)`: 调试日志（灰色）
-- `info(message)`: 信息日志（橙色）
-- `warning(message)`: 警告日志（亮黄色）
-- `error(message)`: 错误日志（亮红色）
-- `success(message)`: 成功日志（亮绿色）
-- `failure(message)`: 失败日志（亮红色）
-- `section(title)`: 分节标题（亮青色）
-- `subsection(title)`: 小节标题（亮蓝色）
-- `highlight(message)`: 高亮消息（亮黄色）
-- `important(message)`: 重要消息（亮紫色）
-- `pink(message)`: 粉色消息
-- `lime(message)`: 青柠色消息
-- `teal(message)`: 蓝绿色消息
-
-**日志输出：**
-- 控制台：炫彩输出
-- 文件：普通格式（保存在logs文件夹）
+提供统一的炫彩日志管理功能，支持多种颜色和日志级别。日志同时输出到控制台（炫彩）和文件（普通格式）。
 
 ### login.py - 登录模块
 
-处理教务系统登录功能，包括密码加密和会话管理。
-
-**主要类：**
-- `GDUTCrypto`: 密码加密工具类
-- `GDUTAuth`: 教务系统认证类
-
-**主要方法：**
-- `GDUTCrypto.encrypt(password, salt)`: AES-CBC加密密码
-- `GDUTAuth.login(username, password)`: 登录教务系统
-- `GDUTAuth.check_login_success()`: 检查登录状态
-- `GDUTAuth.get_session()`: 获取会话对象
-
-**登录流程：**
-1. 获取登录页面
-2. 提取加密盐值
-3. 加密密码
-4. 发送登录请求
-5. 验证登录状态（通过JSESSIONID）
+处理教务系统登录功能，包括密码AES-CBC加密和会话管理（JSESSIONID）。
 
 ### get_schedule.py - 课表获取模块
 
-处理课表数据的获取、解析、筛选和统计。
-
-**主要类：**
-- `ScheduleManager`: 课表管理类
-
-**主要方法：**
-
-#### 数据获取
-- `get_schedule(year, season)`: 获取课表信息
-- `load_schedule_from_file(filepath)`: 从JSON文件加载课表
-- `load_schedule_by_name(year, season, output_dir)`: 根据年份和季节加载课表
-
-#### 数据显示
-- `format_schedule(schedule_data, year, season)`: 格式化课表数据
-- `display_schedule(schedule_data, year, season)`: 显示格式化的课表
-- `display_schedule_from_file(filepath, year, season)`: 从文件加载并显示课表
-- `display_schedule_by_name(year, season, output_dir)`: 根据年份和季节加载并显示课表
-
-#### 数据筛选
-- `filter_courses_by_teacher(schedule_data, teacher_name)`: 根据教师姓名筛选课程
-- `filter_courses_by_day(schedule_data, weekday)`: 根据星期筛选课程
-
-#### 数据统计
-- `get_course_statistics(schedule_data)`: 获取课表统计信息
-- `display_statistics(schedule_data)`: 显示课表统计信息
-
-#### 数据保存
-- `save_schedule_to_file(schedule_data, year, season, filename)`: 保存课表到文件
+处理课表数据的获取、解析、筛选和统计。支持从系统获取或从JSON文件加载课表，提供多种筛选和统计功能。
 
 ### main.py - 主程序
 
 程序入口，提供完整的功能演示和交互式菜单。
-
-**演示功能：**
-1. 登录并获取课表
-2. 从文件加载课表
-3. 按教师筛选课程
-4. 按星期筛选课程
-5. 课表统计
-6. 格式化选项
-7. 获取多个学期的课表
 
 ## 📊 课表数据结构
 
@@ -229,45 +142,22 @@ if auth.login("你的学号", "你的密码"):
 ## 🐛 故障排除
 
 ### 登录失败
-
-**问题：** 登录失败
-**解决方案：**
-- 检查用户名和密码是否正确
-- 确认网络连接正常
-- 查看日志输出的详细错误信息
-- 检查教务系统是否正常访问
+检查用户名密码、网络连接和教务系统访问状态，查看日志获取详细错误信息。
 
 ### 课表获取失败
-
-**问题：** 获取课表失败
-**解决方案：**
-- 确认已成功登录
-- 检查学期代码是否正确
-- 查看是否课表还未开放
-- 查看日志输出的详细错误信息
+确认登录状态、学期代码正确性，检查课表是否已开放，查看日志获取详细错误信息。
 
 ### 依赖包问题
-
-**问题：** 导入模块失败
-**解决方案：**
 ```bash
-# 使用uv
 uv sync
 ```
 
 ### 文件不存在
-
-**问题：** 加载JSON文件时提示文件不存在
-**解决方案：**
-- 确认output文件夹中存在对应的JSON文件
-- 检查文件名格式是否正确（schedule_2025_Autumn.json）
-- 确认年份和季节参数是否正确
+确认output文件夹中存在对应的JSON文件，检查文件名格式（schedule_2025_Autumn.json）和参数是否正确。
 
 ## 📄 许可证
 
 本项目仅供学习交流使用，请勿用于商业用途。
-
-## 📞 联系方式
 
 如有问题或建议，请通过Issue反馈。
 

@@ -8,6 +8,39 @@ from logger import logger
 class ScheduleManager:
     """课表管理类"""
     
+    WEEK_MAP = {
+        "1": "周一",
+        "2": "周二", 
+        "3": "周三",
+        "4": "周四",
+        "5": "周五",
+        "6": "周六",
+        "7": "周日"
+    }
+    
+    SEASON_MAP = {
+        "Autumn": "01",
+        "Spring": "02"
+    }
+    
+    KEY_MAPPING = {
+        "kcmc": "course_name",
+        "kcbh": "course_code",
+        "jxbmc": "class_name",
+        "kcrwdm": "task_code",
+        "jcdm2": "periods",
+        "zcs": "weeks",
+        "xq": "weekday",
+        "jxcdmcs": "classroom",
+        "teaxms": "teachers"
+    }
+    
+    NOT_AVAILABLE_KEYWORDS = [
+        "本学期课表还未开放",
+        "请稍后查询",
+        "课表未开放"
+    ]
+    
     def __init__(self, session: requests.Session = None):
         """初始化课表管理器
         
@@ -28,12 +61,7 @@ class ScheduleManager:
         Returns:
             str: 学年学期代码，如"202501"或"202502"
         """
-        season_map = {
-            "Autumn": "01",
-            "Spring": "02"
-        }
-        
-        season_code = season_map.get(season, "01")
+        season_code = self.SEASON_MAP.get(season, "01")
         
         # Spring学年的代码是前一年加上"02"
         if season == "Spring":
@@ -155,13 +183,7 @@ class ScheduleManager:
         Returns:
             bool: 如果课表未开放返回True
         """
-        not_available_keywords = [
-            "本学期课表还未开放",
-            "请稍后查询",
-            "课表未开放"
-        ]
-        
-        for keyword in not_available_keywords:
+        for keyword in self.NOT_AVAILABLE_KEYWORDS:
             if keyword in html_content:
                 logger.warning(f"⚠️  {year}年{season}课表还未开放，请稍后查询！")
                 return True
@@ -179,19 +201,6 @@ class ScheduleManager:
         """
         schedule_data = []
         
-        # 拼音首字母到英文的映射
-        key_mapping = {
-            "kcmc": "course_name",
-            "kcbh": "course_code",
-            "jxbmc": "class_name",
-            "kcrwdm": "task_code",
-            "jcdm2": "periods",
-            "zcs": "weeks",
-            "xq": "weekday",
-            "jxcdmcs": "classroom",
-            "teaxms": "teachers"
-        }
-        
         # 使用正则表达式提取JSON数据
         # 查找所有类似 {"kcmc":"...","kcbh":"...","jxbmc":"...","kcrwdm":"...","jcdm2":"...","zcs":"...","xq":"...","jxcdmcs":"...","teaxms":"..."} 的模式
         pattern = r'\{[^}]*"kcmc"[^}]*\}'
@@ -206,7 +215,7 @@ class ScheduleManager:
                 # 转换键名为英文
                 converted_data = {}
                 for key, value in data.items():
-                    new_key = key_mapping.get(key, key)
+                    new_key = self.KEY_MAPPING.get(key, key)
                     converted_data[new_key] = value
                 
                 schedule_data.append(converted_data)
@@ -241,17 +250,6 @@ class ScheduleManager:
         else:
             result.append("课表信息")
         
-        # 星期映射
-        week_map = {
-            "1": "周一",
-            "2": "周二", 
-            "3": "周三",
-            "4": "周四",
-            "5": "周五",
-            "6": "周六",
-            "7": "周日"
-        }
-        
         for i, course in enumerate(schedule_data, 1):
             result.append(f"\n课程 {i}:")
             result.append(f"  课程名称: {course.get('course_name', 'N/A')}")
@@ -259,7 +257,7 @@ class ScheduleManager:
             result.append(f"  教学班: {course.get('class_name', 'N/A')}")
             result.append(f"  授课教师: {course.get('teachers', 'N/A')}")
             result.append(f"  教学场地: {course.get('classroom', 'N/A')}")
-            result.append(f"  星期: {week_map.get(course.get('weekday', ''), 'N/A')}")
+            result.append(f"  星期: {self.WEEK_MAP.get(course.get('weekday', ''), 'N/A')}")
             result.append(f"  节次: {course.get('periods', 'N/A')}")
             result.append(f"  周次: {course.get('weeks', 'N/A')}")
         
@@ -382,16 +380,6 @@ class ScheduleManager:
             'courses_by_day': {}
         }
         
-        week_map = {
-            "1": "周一",
-            "2": "周二", 
-            "3": "周三",
-            "4": "周四",
-            "5": "周五",
-            "6": "周六",
-            "7": "周日"
-        }
-        
         for course in schedule_data:
             # 统计教师
             teachers = course.get('teachers', '')
@@ -405,7 +393,7 @@ class ScheduleManager:
             
             # 统计每天的课程数
             weekday = course.get('weekday', '')
-            day_name = week_map.get(weekday, weekday)
+            day_name = self.WEEK_MAP.get(weekday, weekday)
             if day_name not in stats['courses_by_day']:
                 stats['courses_by_day'][day_name] = 0
             stats['courses_by_day'][day_name] += 1
