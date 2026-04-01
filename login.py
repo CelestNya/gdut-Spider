@@ -135,44 +135,76 @@ class GDUTAuth:
         logger.failure(f"登录失败，只找到 {len(jsession_ids)} 个JSESSIONID")
         return False
 
-    def login(self, userid: str, password: str) -> bool:
-        """登录教务系统
-        
+    def login(self, userid: str, password: str, max_age_hours: int = 24) -> bool:
+        """登录教务系统（自动尝试使用缓存的Cookie）
+
         Args:
             userid: 学号
             password: 密码
-            
+            max_age_hours: Cookie 最大有效期（小时）
+
         Returns:
             bool: 登录是否成功
         """
         logger.section("开始登录流程")
         logger.info(f"学号: {userid}")
-        
+
+        cookie_file = self._get_cookie_file(userid)
+
+        if os.path.exists(cookie_file):
+            logger.info("发现已保存的 Cookie")
+
+            try:
+                with open(cookie_file, 'rb') as f:
+                    cookie_data = pickle.load(f)
+
+                timestamp = datetime.fromisoformat(cookie_data['timestamp'])
+                age = datetime.now() - timestamp
+
+                if age > timedelta(hours=max_age_hours):
+                    logger.warning(f"Cookie 已过期（超过 {max_age_hours} 小时）")
+                elif self._load_cookies(userid) and self._verify_cookies():
+                    logger.success("使用缓存的 Cookie 登录成功")
+                    return True
+                else:
+                    logger.warning("Cookie 验证失败，将重新登录")
+                    self.session.cookies.clear()
+
+            except Exception as e:
+                logger.warning(f"加载 Cookie 失败: {e}")
+                self.session.cookies.clear()
+
+        logger.info("开始从头登录")
+
         try:
             logger.subsection("步骤1: 获取登录页面")
             response = self.session.get(self.LOGIN_SERVICE_URL)
             response.raise_for_status()
-            
+
             logger.subsection("步骤2: 解析页面中的隐藏参数")
             soup = bs4.BeautifulSoup(response.text, "html.parser")
-            
+
             salt = self._extract_salt(soup)
             if not salt:
                 logger.failure("未找到加密盐值 'pwdEncryptSalt'")
                 return False
-            
+
             logger.subsection("步骤3: 构建登录参数")
             form_data = self._build_login_data(soup, userid, password, salt)
-            
+
             logger.subsection("步骤4: 发送登录请求")
             login_path = "authserver/login"
             encoded_login_service = requests.utils.quote(self.LOGIN_SERVICE_URL)
             full_login_uri = self._build_url(login_path, f"service={encoded_login_service}")
-            
+
             login_response = self.session.post(full_login_uri, data=form_data)
-            
-            return self._check_jsessionid_count()
-                
+
+            if self._check_jsessionid_count():
+                self._save_cookies(userid)
+                return True
+
+            return False
+
         except requests.RequestException as e:
             logger.failure(f"登录请求失败: {e}")
             return False
@@ -187,38 +219,39 @@ class GDUTAuth:
     
     def _get_cookie_file(self, userid: str) -> str:
         """获取 Cookie 文件路径
-        
+
         Args:
             userid: 学号
-            
+
         Returns:
             str: Cookie 文件路径
         """
         user_dir = os.path.join("cookies", userid)
-        os.makedirs(user_dir, exist_ok=True)
         return os.path.join(user_dir, "session.pkl")
     
     def _save_cookies(self, userid: str):
         """保存 Cookie 到文件
-        
+
         Args:
             userid: 学号
         """
         try:
             cookie_file = self._get_cookie_file(userid)
-            
+            user_dir = os.path.dirname(cookie_file)
+            os.makedirs(user_dir, exist_ok=True)
+
             cookie_data = {
                 "cookies": self.session.cookies,
                 "headers": dict(self.session.headers),
                 "timestamp": datetime.now().isoformat(),
                 "userid": userid
             }
-            
+
             with open(cookie_file, 'wb') as f:
                 pickle.dump(cookie_data, f)
-            
+
             logger.success(f"Cookie 已保存到: {cookie_file}")
-            
+
         except Exception as e:
             logger.warning(f"保存 Cookie 失败: {e}")
     
@@ -287,50 +320,3 @@ class GDUTAuth:
         except Exception as e:
             logger.warning(f"验证 Cookie 失败: {e}")
             return False
-    
-    def login_with_cache(self, userid: str, password: str, max_age_hours: int = 24) -> bool:
-        """带缓存的登录方法
-        
-        Args:
-            userid: 学号
-            password: 密码
-            max_age_hours: Cookie 最大有效期（小时）
-            
-        Returns:
-            bool: 登录是否成功
-        """
-        logger.section("开始登录流程")
-        logger.info(f"学号: {userid}")
-        
-        cookie_file = self._get_cookie_file(userid)
-        
-        if os.path.exists(cookie_file):
-            logger.info("发现已保存的 Cookie")
-            
-            try:
-                with open(cookie_file, 'rb') as f:
-                    cookie_data = pickle.load(f)
-                
-                timestamp = datetime.fromisoformat(cookie_data['timestamp'])
-                age = datetime.now() - timestamp
-                
-                if age > timedelta(hours=max_age_hours):
-                    logger.warning(f"Cookie 已过期（超过 {max_age_hours} 小时）")
-                elif self._load_cookies(userid) and self._verify_cookies():
-                    logger.success("使用缓存的 Cookie 登录成功")
-                    return True
-                else:
-                    logger.warning("Cookie 验证失败，将重新登录")
-                    self.session.cookies.clear()
-                        
-            except Exception as e:
-                logger.warning(f"加载 Cookie 失败: {e}")
-                self.session.cookies.clear()
-        
-        logger.info("开始从头登录")
-        
-        if self.login(userid, password):
-            self._save_cookies(userid)
-            return True
-        
-        return False
