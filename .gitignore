@@ -21,3 +21,4 @@ cookies/
 # test files
 test.py
 .env
+.claude/settings.local.json
